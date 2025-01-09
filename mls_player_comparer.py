@@ -61,12 +61,12 @@ def radar(player, position, stats, title):
     radar.draw_param_labels(ax=ax, fontsize=14, color="black")
 
     # Draw range (inner) labels
-    #radar.draw_range_labels(ax=ax, fontsize=10, color="gray")
+    radar.draw_range_labels(ax=ax, fontsize=8, color="gray")
 
     # Add title
     fig.text(
-        0.5, 0.98, title,
-        ha="center", fontsize=18, color="black", weight="bold"
+        0.5, .9, title,
+        ha="center", fontsize=30, color="black", weight="bold"
     )
 
     return fig
@@ -249,7 +249,15 @@ def load_gk():
     
 #create app
 def main():
-    st.title("MLS Player Comparer")
+    #st.title("MLS Player Comparer")
+    teams = {"InterMiami": "Inter Miami", "ColumbusCrew":"Columbus Crew", 'FCCincinnati':"FC Cincinnati", 'OrlandoCity':"Orlando City",
+       'CharlotteFC': "Charlotte FC", 'NewYorkCityFC': "New York City FC", 'NewYorkRedBulls': "New York Red Bulls", 'CFMontreal':"CF Montreal",
+       'AtlantaUnited':"Atlanta United", 'DCUnited':"DC United", 'TorontoFC':"Toronto FC", 'PhiladelphiaUnion':"Philadelphia Union",
+       'NashvilleSC':"Nashville SC", 'NewEnglandRevolution':"New England Revolution", 'ChicagoFire': "Chicago Fire",
+       'LosAngelesFC': "Los Angeles FC", 'LAGalaxy': "LA Galaxy", 'RealSaltLake': "Real Salt Lake", 'SeattleSoundersFC': "Seattle Sounders FC",
+       'HoustonDynamo': "Houston Dynamo", 'MinnesotaUnited': "Minnesota United", 'ColoradoRapids': "Colorado Rapids",
+       'VancouverWhitecapsFC': "Vancouver Whitecaps FC", 'PortlandTimbers':"Portland Timbers", 'AustinFC':"Austin FC", 'FCDallas':"FC Dallas",
+       'StLouisCity':"St Louis City", 'SportingKansasCity':"Sporting Kansas City", 'SanJoseEarthquakes':"San Jose Earthquakes"}
     f = load()
     g=load_gk()
     pl = f.copy()
@@ -278,7 +286,7 @@ def main():
     compare = st.sidebar.text_input("Enter a Player to Compare To (Optional)")
     position = st.sidebar.selectbox("Select Position",options=["FW","MF","DF","GK"])
     df = gk if position=="GK" else pl
-    all_player_names = df["Player"].apply(lambda x: unidecode(x.lower())).tolist()
+    all_player_names = df["Player"].apply(lambda x: unidecode(x)).tolist()
     stats = df.columns.tolist()
     excluded_cols = ["Player", "Team", "Position", "Age", "Similarity", "Secondary Position", "Nation", "Conference"]
     stats = [col for col in stats if col not in excluded_cols]
@@ -286,15 +294,23 @@ def main():
     chart_type = st.sidebar.selectbox("Select Chart Type",options=["Radar", "Pizza"])
     threshold = st.sidebar.slider("# Similar Players", 1, 25,1)
     #choose df from position, then provide available stats for selection
-    df["Player"] = df["Player"].apply(lambda x: unidecode(x.lower()) if isinstance(x, str) else x.lower())
+    df["Player"] = df["Player"].apply(lambda x: unidecode(x) if isinstance(x, str) else x)
     if name:
-        name = name.lower()
-        suggestions = [player for player in all_player_names if player.startswith(name)]
+        name = name.title()
+        #implement suggest name feature
+        suggestions = [player for player in all_player_names if name in player]
         if len(suggestions) > 0:
-            st.sidebar.text("Suggestions: " + ", ".join(suggestions[:5]))
+            selected_name = st.selectbox(
+                "Suggestions",
+                suggestions,
+                index=0, 
+                help="Select a player from the suggestions below."
+            )
+            name = selected_name
         else:
-            st.sidebar.text("No suggestions available.")
+            st.warning("No suggestions available.")
         player = df[df["Player"]==name]
+        #name = 
         if not player.empty:
             position_data = df[df["Position"] == position].copy()
             #temporarily add the player to the position data if positions don't match
@@ -307,11 +323,11 @@ def main():
                     position_data = pd.concat([position_data, temp_player], ignore_index=True)
             #check if comparison player exists
             if compare:
-                st.header(f"{name} vs. {compare}")
-                compare = compare.lower()
-                suggestions = [player for player in all_player_names if player.startswith(compare)]
+                #st.header(f"{name.title()} vs. {compare.title()}")
+                compare = compare.title()
+                suggestions = [player for player in all_player_names if compare in player]
                 if len(suggestions) > 0:
-                    st.sidebar.text("Suggestions: " + ", ".join(suggestions[:5]))
+                    st.sidebar.text("Compare Suggestions: " + ", ".join(suggestions[:5]))
                 else:
                     st.sidebar.text("No suggestions available.")
                 #player_2 = df[df["Player"].lower()==compare]
@@ -323,8 +339,8 @@ def main():
                     temp_player = player_2.copy()
                     temp_player["Position"] = position
                     position_data = pd.concat([position_data, temp_player], ignore_index=True)
-            else:
-                  st.header(f"{name}")
+            #else:
+                  #st.header(f"{name}")
             for stat in stats:
                 if stat not in position_data.columns:
                     st.warning(f"Stat '{stat}' is not found in the data and will be skipped.")
@@ -363,7 +379,8 @@ def main():
                 st.warning("No stats available for this position")
             #get similar players
             similar = similarity(df,name,position,stats, threshold)
-            #similar["Player"] = 
+            similar["Team"] = similar["Team"].apply(lambda x: teams.get(x))
+            #similar["Player"] = similar["Player"].apply(lambda x: unidecode(x.title()))
             if similar is not None and not similar.empty:
                 st.subheader("Similar Players")
                 st.dataframe(similar)
