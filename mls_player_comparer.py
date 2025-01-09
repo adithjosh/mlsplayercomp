@@ -334,6 +334,14 @@ def main():
             st.warning("Please select stats to evaluate the best players.")
         else:
             position_data = df[df["Position"] == position].copy()
+            position_data["Team"] = position_data["Team"].apply(lambda x: teams.get(x))
+            #country filter
+            if nation_filter != "All":
+                position_data = position_data[position_data["Nation"] == nation_filter]
+
+            #team filter
+            if team_filter != "All":
+                position_data = position_data[position_data["Team"] == team_filter]
 
             position_data[stats] = position_data[stats].fillna(0)
 
