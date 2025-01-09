@@ -1,4 +1,5 @@
 # mlsplayercomp
+URL: https://mls2324comp.streamlit.app/
 Python App that creates radar or pizza charts for MLS Players based on 23/24 data. Allows for comparison and similarity table creation.
 
 This app uses a dataset I created based on MLS 23/24 data from FBRef and utilizes the mplsoccer package to create Pizza and Python charts of MLS players.
