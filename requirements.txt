@@ -1,7 +1,8 @@
-streamlit
+cstreamlit
 pandas
 numpy
 matplotlib
 scipy
 scikit-learn
 mplsoccer
+unidecode
