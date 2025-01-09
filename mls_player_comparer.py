@@ -19,10 +19,10 @@ if 'warnings' not in sys.modules:
     
 #radar chart creation
 def radar(player, position, stats, title):
-    # Define the parameters and their ranges
-    params = stats  # List of stat names
-    low = [0] * len(params)  # Minimum value for each stat
-    high = [100] * len(params)  # Maximum value for each stat (percentile range)
+    #define params & respective and ranges
+    params = stats  #list of stat names
+    low = [0] * len(params)  #min val (next max) per stat for percentile calc
+    high = [100] * len(params)
 
     # Player and Position Values
     player_values = [player[stat] * 100 for stat in stats]  # Player percentiles
@@ -152,7 +152,7 @@ def pizza(player,player_2,stats,title, name1=None,name2=None):
             other_circle_ls="-."           
         )
 
-        # Plot pizza for player
+        #plot pizza for player
         fig, ax = baker.make_pizza(
             player_vals,                 #player values
             figsize=(8, 8),                
@@ -245,17 +245,17 @@ def similarity(df,name,position,stats,threshold, nation, team):
 
     player_percentiles = player_percentiles.iloc[0].to_numpy().reshape(1, -1)
 
-    # Use percentiles for similarity calculation
+    #perform similarity calculation
     similarity_scores = cosine_similarity(
         position_data[[f"{stat}_Percentile" for stat in stats]], player_percentiles
     ).flatten()
     position_data["Similarity"] = similarity_scores*100
 
-    # Sort by similarity
+    #sort
     position_data = position_data.sort_values("Similarity", ascending=False)
 
-    # Add raw values for radar stats
-    radar_stats = stats  # Use the raw stats for display purposes
+    #use raw values for radar stats (dislay purpose)
+    radar_stats = stats
     output_columns = ["Player", "Team", "Age", "Nation", "Position", "Similarity"] + radar_stats
 
     return position_data[output_columns].head(threshold)
@@ -354,12 +354,12 @@ def main():
 
             #uesa average percentile for comparisons
             percentile_columns = [f"{stat}_Percentile" for stat in stats]
-            position_data["Average Percentile"] = round(position_data[percentile_columns].mean(axis=1)*100,1)
+            position_data["Score"] = round(position_data[percentile_columns].mean(axis=1)*100,1)
 
-            top_players = position_data.sort_values("Average Percentile", ascending=False).head(threshold)
+            top_players = position_data.sort_values("Score", ascending=False).head(threshold)
             st.write(f"### Top {threshold} Players in Position: {position}")
             st.dataframe(
-                top_players[["Player", "Team", "Age","Nation","Average Percentile"] + stats]
+                top_players[["Player", "Team", "Age","Nation","Score"] + stats]
             )
     #choose df from position, then provide available stats for selection
     df["Player"] = df["Player"].apply(lambda x: unidecode(x) if isinstance(x, str) else x)
