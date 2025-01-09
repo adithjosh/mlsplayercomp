@@ -192,18 +192,29 @@ def pizza(player,player_2,stats,title, name1=None,name2=None):
     return fig
 
 #similarity calc
-def similarity(df,name,position,stats,threshold=5):
+def similarity(df,name,position,stats,threshold, nation, team):
+    teams = {"InterMiami": "Inter Miami", "ColumbusCrew":"Columbus Crew", 'FCCincinnati':"FC Cincinnati", 'OrlandoCity':"Orlando City",
+       'CharlotteFC': "Charlotte FC", 'NewYorkCityFC': "New York City FC", 'NewYorkRedBulls': "New York Red Bulls", 'CFMontreal':"CF Montreal",
+       'AtlantaUnited':"Atlanta United", 'DCUnited':"DC United", 'TorontoFC':"Toronto FC", 'PhiladelphiaUnion':"Philadelphia Union",
+       'NashvilleSC':"Nashville SC", 'NewEnglandRevolution':"New England Revolution", 'ChicagoFire': "Chicago Fire",
+       'LosAngelesFC': "Los Angeles FC", 'LAGalaxy': "LA Galaxy", 'RealSaltLake': "Real Salt Lake", 'SeattleSoundersFC': "Seattle Sounders FC",
+       'HoustonDynamo': "Houston Dynamo", 'MinnesotaUnited': "Minnesota United", 'ColoradoRapids': "Colorado Rapids",
+       'VancouverWhitecapsFC': "Vancouver Whitecaps FC", 'PortlandTimbers':"Portland Timbers", 'AustinFC':"Austin FC", 'FCDallas':"FC Dallas",
+       'StLouisCity':"St Louis City", 'SportingKansasCity':"Sporting Kansas City", 'SanJoseEarthquakes':"San Jose Earthquakes"}
     player=df[df["Player"]==name]
     if player.empty: #null case
         st.error(f"{name} not found")
         return None
-    
-    #ensure player is present in position df
-    if player["Position"].iloc[0] != position:
-        player["Position"] = position
-        df = pd.concat([df,player], ignore_index=True)
     position_data = df[df["Position"] == position].copy()
-
+    position_data["Team"] = position_data["Team"].apply(lambda x: teams.get(x))
+    if nation:
+        position_data = position_data[position_data["Nation"]==nation].copy()
+    if team:
+        position_data = position_data[position_data["Team"]==team].copy()
+    #ensure player is present in position df
+    if not position_data.isin(player).all(axis=1).any():
+        position_data = pd.concat([position_data,player], ignore_index=True)
+    position_data = position_data.drop_duplicates()
     #calculate percentiles
     for stat in stats:
         position_data[f"{stat}_Percentile"] = rankdata(position_data[stat], method="average") / len(position_data)
@@ -224,14 +235,14 @@ def similarity(df,name,position,stats,threshold=5):
     similarity_scores = cosine_similarity(
         position_data[[f"{stat}_Percentile" for stat in stats]], player_percentiles
     ).flatten()
-    position_data["Similarity"] = similarity_scores
+    position_data["Similarity"] = similarity_scores*100
 
     # Sort by similarity
     position_data = position_data.sort_values("Similarity", ascending=False)
 
     # Add raw values for radar stats
     radar_stats = stats  # Use the raw stats for display purposes
-    output_columns = ["Player", "Team", "Age","Position", "Similarity"] + radar_stats
+    output_columns = ["Player", "Team", "Age", "Nation", "Position", "Similarity"] + radar_stats
 
     return position_data[output_columns].head(threshold)
 
@@ -280,19 +291,28 @@ def main():
            "Goals Allowed Per 90", "Pass >40 Yards Cmp%"]
 }
 
-    
+    #setup sidebar and tabs
     st.sidebar.header("Player Search and Filters")
-    name = st.sidebar.text_input("Enter a Player's Name",help="Suggestions will appear once you type.")
-    compare = st.sidebar.text_input("Enter a Player to Compare To (Optional)")
-    position = st.sidebar.selectbox("Select Position",options=["FW","MF","DF","GK"])
-    df = gk if position=="GK" else pl
-    all_player_names = df["Player"].apply(lambda x: unidecode(x)).tolist()
-    stats = df.columns.tolist()
-    excluded_cols = ["Player", "Team", "Position", "Age", "Similarity", "Secondary Position", "Nation", "Conference"]
-    stats = [col for col in stats if col not in excluded_cols]
-    stats=st.sidebar.multiselect("Select Stats for Chart & Table:",options=stats,default=default_stats.get(position))
-    chart_type = st.sidebar.selectbox("Select Chart Type",options=["Radar", "Pizza"])
-    threshold = st.sidebar.slider("# Similar Players", 1, 25,1)
+    with st.sidebar.expander("Required", expanded=True):
+        name = st.text_input("Enter a Player's Name", help="Suggestions will appear once you type.")        
+        position = st.selectbox("Select Position", options=["FW", "MF", "DF", "GK"])
+        chart_type = st.selectbox("Select Chart Type", options=["Radar", "Pizza"])
+    with st.sidebar.expander("Optional Filters", expanded=False):
+        df = gk if position=="GK" else pl
+        all_player_names = df["Player"].apply(lambda x: unidecode(x)).tolist()
+        stats = df.columns.tolist()
+        excluded_cols = ["Player", "Team", "Position", "Age", "Similarity", "Secondary Position", "Nation", "Conference"]
+        stats = [col for col in stats if col not in excluded_cols]
+        compare = st.text_input("Enter a Player to Compare To (Optional)")
+        stats = st.multiselect(
+            "Select Stats for Chart & Table:",
+            options=stats,
+            default=default_stats.get(position)
+        )
+        nation_filter = st.selectbox("Filter by Nation", options=["All"] + sorted(df["Nation"].dropna().unique().tolist()))
+        team_filter = st.selectbox("Filter by Team", options=["All"] + list(teams.values()))
+        threshold = st.slider("# Similar Players", 1, 25, 1) 
+
     #choose df from position, then provide available stats for selection
     df["Player"] = df["Player"].apply(lambda x: unidecode(x) if isinstance(x, str) else x)
     if name:
@@ -312,6 +332,8 @@ def main():
         player = df[df["Player"]==name]
         #name = 
         if not player.empty:
+            if len(stats)<3:
+                st.warning("Select 3 or more stats for visualization")
             position_data = df[df["Position"] == position].copy()
             #temporarily add the player to the position data if positions don't match
             if player["Position"].iloc[0] != position:
@@ -325,11 +347,15 @@ def main():
             if compare:
                 #st.header(f"{name.title()} vs. {compare.title()}")
                 compare = compare.title()
-                suggestions = [player for player in all_player_names if compare in player]
+                suggest = [player for player in all_player_names if compare in player]
                 if len(suggestions) > 0:
-                    st.sidebar.text("Compare Suggestions: " + ", ".join(suggestions[:5]))
-                else:
-                    st.sidebar.text("No suggestions available.")
+                    selected_comp = st.selectbox(
+                        "Compare Suggestions",
+                        suggest,
+                        index=0, 
+                        help="Select a player from the suggestions below to compare with."
+                    )
+                    compare = selected_comp
                 #player_2 = df[df["Player"].lower()==compare]
                 player_2 = df[df["Player"]==compare]
                 if player_2.empty:
@@ -366,26 +392,44 @@ def main():
                 if compare:
                     title = f"{name} vs {compare} - {position} Comparison"
                     fig = pizza(player_stats, player_2_stats, stats, title, name, compare)
-                    st.pyplot(fig)
+                    #st.pyplot(fig)
                 elif chart_type == "Pizza":
                     fig=pizza(player_stats,None,stats,f"{name} - {position} Analysis")
-                    st.pyplot(fig)
+                    #st.pyplot(fig)
                 elif chart_type == "Radar":
                     fig=radar(player_stats,position_stats,stats,f"{name} - {position} Analysis")
-                    st.pyplot(fig)
+                    #st.pyplot(fig)
                 else:
                     st.warning("Choose Chart Type")
             else:
                 st.warning("No stats available for this position")
-            #get similar players
-            similar = similarity(df,name,position,stats, threshold)
-            similar["Team"] = similar["Team"].apply(lambda x: teams.get(x))
-            #similar["Player"] = similar["Player"].apply(lambda x: unidecode(x.title()))
-            if similar is not None and not similar.empty:
+            #similar["Player"] = similar["Player"].apply(lambda x: unidecode(x.title()))            
+            tab1, tab2 = st.tabs(["Chart", "Similar Players"])
+            with tab1:
+                st.pyplot(fig)
+            with tab2:
                 st.subheader("Similar Players")
-                st.dataframe(similar)
-            else:
-                st.error("Player not found")
+                #nation filter
+                if name not in all_player_names:
+                    st.warning("Player not found")
+                else:
+                    if nation_filter == "All":
+                        nation = None
+                    else:
+                        nation = nation_filter
+                    #team filter
+                    if team_filter == "All":
+                        team = None
+                    else:
+                        team = team_filter
+                    #get similar players
+                    similar = similarity(df,name,position,stats, threshold, nation, team)
+                    
+                    if not similar.empty:
+                        st.dataframe(similar)
+                    else:
+                        st.warning("No similar players found matching the selected filters.")    
+
         st.sidebar.info(
         """
         **Note**: Currently only have comparison pizza graphs, not radar.
