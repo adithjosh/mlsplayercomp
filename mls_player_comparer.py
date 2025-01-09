@@ -191,6 +191,20 @@ def pizza(player,player_2,stats,title, name1=None,name2=None):
 
     return fig
 
+def highlight(row, player):
+    styles = []
+    for col in row.index:
+        if col in player:
+            if row[col] > player[col]:
+                styles.append("background-color: lightgreen")
+            elif row[col] < player[col]:
+                styles.append("background-color: lightcoral")
+            else:
+                styles.append("")  # No change if equal
+        else:
+            styles.append("")  # No styling for non-stat columns
+    return styles
+
 #similarity calc
 def similarity(df,name,position,stats,threshold, nation, team):
     teams = {"InterMiami": "Inter Miami", "ColumbusCrew":"Columbus Crew", 'FCCincinnati':"FC Cincinnati", 'OrlandoCity':"Orlando City",
@@ -293,6 +307,7 @@ def main():
 
     #setup sidebar and tabs
     st.sidebar.header("Player Search and Filters")
+    tab1, tab2,tab3 = st.tabs(["Chart", "Similar Players", "Best Players"])
     with st.sidebar.expander("Required", expanded=True):
         name = st.text_input("Enter a Player's Name", help="Suggestions will appear once you type.")        
         position = st.selectbox("Select Position", options=["FW", "MF", "DF", "GK"])
@@ -311,8 +326,33 @@ def main():
         )
         nation_filter = st.selectbox("Filter by Nation", options=["All"] + sorted(df["Nation"].dropna().unique().tolist()))
         team_filter = st.selectbox("Filter by Team", options=["All"] + list(teams.values()))
-        threshold = st.slider("# Similar Players", 1, 25, 1) 
+        threshold = st.slider("Number of Similar/Best Players", 1, 25, 1) 
+    with tab3:
+        #st.subheader("Top Players Across Selected Stats")
 
+        if not stats:
+            st.warning("Please select stats to evaluate the best players.")
+        else:
+            position_data = df[df["Position"] == position].copy()
+
+            position_data[stats] = position_data[stats].fillna(0)
+
+            for stat in stats:
+                position_data[f"{stat}_Percentile"] = rankdata(position_data[stat], method="average") / len(position_data)
+
+                inverse_stats = ["Errors Per 90", "Goals Allowed Per 90", "GA/SoT Per 90"]
+                if stat in inverse_stats:
+                    position_data[f"{stat}_Percentile"] = 1 - position_data[f"{stat}_Percentile"]
+
+            #uesa average percentile for comparisons
+            percentile_columns = [f"{stat}_Percentile" for stat in stats]
+            position_data["Average Percentile"] = round(position_data[percentile_columns].mean(axis=1)*100,1)
+
+            top_players = position_data.sort_values("Average Percentile", ascending=False).head(threshold)
+            st.write(f"### Top {threshold} Players in Position: {position}")
+            st.dataframe(
+                top_players[["Player", "Team", "Age","Nation","Average Percentile"] + stats]
+            )
     #choose df from position, then provide available stats for selection
     df["Player"] = df["Player"].apply(lambda x: unidecode(x) if isinstance(x, str) else x)
     if name:
@@ -404,7 +444,7 @@ def main():
             else:
                 st.warning("No stats available for this position")
             #similar["Player"] = similar["Player"].apply(lambda x: unidecode(x.title()))            
-            tab1, tab2 = st.tabs(["Chart", "Similar Players"])
+            #develop tab contents
             with tab1:
                 st.pyplot(fig)
             with tab2:
@@ -426,11 +466,15 @@ def main():
                     similar = similarity(df,name,position,stats, threshold, nation, team)
                     #similar.reset_index(drop=True, inplace=True)
                     similar = similar.drop_duplicates(subset=['Player'])
+                    #get player and pass for highlighter +/-
+                    player = similar.iloc[0].to_dict()
+                    #similar = similar.style.apply(lambda row: highlight(row,player),axis=1)
                     if not similar.empty:
                         st.dataframe(similar)
                     else:
                         st.warning("No similar players found matching the selected filters.")    
 
+            
         st.sidebar.info(
         """
         **Note**: Currently only have comparison pizza graphs, not radar.
