@@ -312,6 +312,7 @@ def main():
         name = st.text_input("Enter a Player's Name", help="Suggestions will appear once you type.")        
         position = st.selectbox("Select Position", options=["FW", "MF", "DF", "GK"])
         chart_type = st.selectbox("Select Chart Type", options=["Radar", "Pizza"])
+        threshold = st.slider("Number of Similar/Best Players", 1, 25, 1) 
     with st.sidebar.expander("Optional Filters", expanded=False):
         df = gk if position=="GK" else pl
         all_player_names = df["Player"].apply(lambda x: unidecode(x)).tolist()
@@ -326,7 +327,7 @@ def main():
         )
         nation_filter = st.selectbox("Filter by Nation", options=["All"] + sorted(df["Nation"].dropna().unique().tolist()))
         team_filter = st.selectbox("Filter by Team", options=["All"] + list(teams.values()))
-        threshold = st.slider("Number of Similar/Best Players", 1, 25, 1) 
+        
     with tab3:
         #st.subheader("Top Players Across Selected Stats")
 
