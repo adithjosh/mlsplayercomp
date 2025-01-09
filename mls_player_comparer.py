@@ -424,7 +424,7 @@ def main():
                         team = team_filter
                     #get similar players
                     similar = similarity(df,name,position,stats, threshold, nation, team)
-                    
+                    similar = similar.drop_duplicates()
                     if not similar.empty:
                         st.dataframe(similar)
                     else:
