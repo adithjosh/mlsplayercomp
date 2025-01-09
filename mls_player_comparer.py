@@ -214,7 +214,7 @@ def similarity(df,name,position,stats,threshold, nation, team):
     #ensure player is present in position df
     if not position_data.isin(player).all(axis=1).any():
         position_data = pd.concat([position_data,player], ignore_index=True)
-    position_data = position_data.drop_duplicates()
+    position_data = position_data.drop_duplicates(subset=["Player"])
     #calculate percentiles
     for stat in stats:
         position_data[f"{stat}_Percentile"] = rankdata(position_data[stat], method="average") / len(position_data)
@@ -424,7 +424,8 @@ def main():
                         team = team_filter
                     #get similar players
                     similar = similarity(df,name,position,stats, threshold, nation, team)
-                    similar = similar.drop_duplicates()
+                    #similar.reset_index(drop=True, inplace=True)
+                    similar = similar.drop_duplicates(subset=['Player'])
                     if not similar.empty:
                         st.dataframe(similar)
                     else:
