@@ -11,6 +11,7 @@ from matplotlib.ticker import FixedLocator
 from mplsoccer import PyPizza, FontManager, Radar
 import warnings
 import sys
+from unidecode import unidecode
 if 'warnings' not in sys.modules:
     import warnings
 
@@ -256,35 +257,45 @@ def main():
     if pl.empty or gk.empty:
         st.error("Dataset could not be loaded. Please check the file path.")
         return
+    default_stats = {
+    "FW": ["Goals per 90", "xG per 90", "Assists Per 90", "xAG per 90", 
+           "Aerial Win %", "Shot Creating Actions per 90", "SoT per 90", 
+           "Take-Ons Attempted per 90", "Passes Completed Per 90"],
+    "MF": ["Successful Take-On %", "Pass Completion Rate", "Tackles Won %", 
+           "Shot Creating Actions per 90", "Dribble Dist per 90", "Goals per Shot", 
+           "Interceptions Per 90", "Total Prog Pass Dist per 90", "Prog Passes Rec Per 90"],
+    "DF": ["Tackles Won %", "Shot Creating Actions per 90", "npXG+xAG per 90", 
+           "Progressive Passes Per 90", "Errors Per 90", "Passes Completed Per 90", 
+           "Dribble Dist per 90", "Pass 15-30 Comp %", "Aerial Win %", "Long Pass Cmp%"],
+    "GK": ["Save %", "PSxG-GA per 90", "Pass Completion Rate", "Errors Per 90", 
+           "Crosses Stopped %", "Avg Pass Length", "GA/SoT Per 90", 
+           "Goals Allowed Per 90", "Pass >40 Yards Cmp%"]
+}
+
+    
     st.sidebar.header("Player Search and Filters")
-    name = st.sidebar.text_input("Enter a Player's Name")
+    name = st.sidebar.text_input("Enter a Player's Name",help="Suggestions will appear once you type.")
     compare = st.sidebar.text_input("Enter a Player to Compare To (Optional)")
     position = st.sidebar.selectbox("Select Position",options=["FW","MF","DF","GK"])
+    df = gk if position=="GK" else pl
+    all_player_names = df["Player"].apply(lambda x: unidecode(x.lower())).tolist()
+    stats = df.columns.tolist()
+    excluded_cols = ["Player", "Team", "Position", "Age", "Similarity", "Secondary Position", "Nation", "Conference"]
+    stats = [col for col in stats if col not in excluded_cols]
+    stats=st.sidebar.multiselect("Select Stats for Chart & Table:",options=stats,default=default_stats.get(position))
     chart_type = st.sidebar.selectbox("Select Chart Type",options=["Radar", "Pizza"])
     threshold = st.sidebar.slider("# Similar Players", 1, 25,1)
-    st.sidebar.info(
-        """
-        **Note**: Currently only have comparison pizza graphs, not radar.
-        Also, percentiles for certain stats *Errors Per 90*, *Goals Allowed Per 90*, 
-        and *GA/SoT Per 90* are **inverted**. This means lower raw values for these stats 
-        correspond to higher percentiles, as lower values indicate better performance.
-        """
-    )
-    df = gk if position=="GK" else pl
+    #choose df from position, then provide available stats for selection
+    df["Player"] = df["Player"].apply(lambda x: unidecode(x.lower()) if isinstance(x, str) else x.lower())
     if name:
-        player=df[df["Player"]==name]
+        name = name.lower()
+        suggestions = [player for player in all_player_names if player.startswith(name)]
+        if len(suggestions) > 0:
+            st.sidebar.text("Suggestions: " + ", ".join(suggestions[:5]))
+        else:
+            st.sidebar.text("No suggestions available.")
+        player = df[df["Player"]==name]
         if not player.empty:
-            if position == "FW":
-                stats = ["Goals per 90", "xG per 90", "Assists Per 90",  "xAG per 90", 
-                         "Aerial Win %", "Shot Creating Actions per 90", "SoT per 90", "Take-Ons Attempted per 90", "Passes Completed Per 90"]
-            elif position == "MF":
-                stats = ["Successful Take-On %", "Pass Completion Rate", "Tackles Won %", 
-                         "Shot Creating Actions per 90", "Dribble Dist per 90", "Goals per Shot", "Interceptions Per 90", "Total Prog Pass Dist per 90", "Prog Passes Rec Per 90"]
-            elif position == "DF":
-                stats = ["Tackles Won %", "Shot Creating Actions per 90", "npXG+xAG per 90", "Progressive Passes Per 90", 
-                         "Errors Per 90", "Passes Completed Per 90", "Dribble Dist per 90", "Pass 15-30 Comp %", "Aerial Win %", "Long Pass Cmp%"]
-            else:
-                stats = ["Save %", "PSxG-GA per 90", "Pass Completion Rate","Errors Per 90", "Crosses Stopped %", "Avg Pass Length", "GA/SoT Per 90", "Goals Allowed Per 90", "Pass >40 Yards Cmp%"]
             position_data = df[df["Position"] == position].copy()
             #temporarily add the player to the position data if positions don't match
             if player["Position"].iloc[0] != position:
@@ -297,6 +308,13 @@ def main():
             #check if comparison player exists
             if compare:
                 st.header(f"{name} vs. {compare}")
+                compare = compare.lower()
+                suggestions = [player for player in all_player_names if player.startswith(compare)]
+                if len(suggestions) > 0:
+                    st.sidebar.text("Suggestions: " + ", ".join(suggestions[:5]))
+                else:
+                    st.sidebar.text("No suggestions available.")
+                #player_2 = df[df["Player"].lower()==compare]
                 player_2 = df[df["Player"]==compare]
                 if player_2.empty:
                     st.warning(f"{compare} not found")
@@ -308,6 +326,10 @@ def main():
             else:
                   st.header(f"{name}")
             for stat in stats:
+                if stat not in position_data.columns:
+                    st.warning(f"Stat '{stat}' is not found in the data and will be skipped.")
+                    continue
+                position_data[stat] = position_data[stat].fillna(0)
                 position_data[f"{stat}_Percentile"] = rankdata(position_data[stat], method="average") / len(position_data)
                 #inverse/lower score=better stats
                 inverse_stats = ["Errors Per 90", "Goals Allowed Per 90", "GA/SoT Per 90"]
@@ -341,11 +363,20 @@ def main():
                 st.warning("No stats available for this position")
             #get similar players
             similar = similarity(df,name,position,stats, threshold)
+            #similar["Player"] = 
             if similar is not None and not similar.empty:
                 st.subheader("Similar Players")
                 st.dataframe(similar)
             else:
                 st.error("Player not found")
+        st.sidebar.info(
+        """
+        **Note**: Currently only have comparison pizza graphs, not radar.
+        Also, percentiles for certain stats *Errors Per 90*, *Goals Allowed Per 90*, 
+        and *GA/SoT Per 90* are **inverted**. This means lower raw values for these stats 
+        correspond to higher percentiles, as lower values indicate better performance.
+        """
+    )
 if __name__ == "__main__":
     main()
                 
