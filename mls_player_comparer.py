@@ -311,20 +311,12 @@ def main():
     with st.sidebar.expander("Required", expanded=True):
         position = st.selectbox("Select Position", options=["FW", "MF", "DF", "GK"])
         df = gk if position=="GK" else pl
-        all_player_names = df["Player"].apply(lambda x: unidecode(x)).tolist()
-        name = st.text_input("Enter a Player's Name", help="Suggestions will appear once you type.")
-        if name:
-            name = name.title()
-            #implement suggest name feature
-            suggestions = [player for player in all_player_names if name in player]
-            if len(suggestions) > 0:
-                selected_name = st.selectbox(
-                    "Suggestions",
-                    suggestions,
-                    index=0, 
-                    help="Select a player from the suggestions below."
-                )
-                name = selected_name        
+        all_player_names = sorted(df["Player"].apply(lambda x: unidecode(x)).tolist())
+        name = st.selectbox(
+                    "Select a Player",
+                    options=[""]+all_player_names, 
+                    help="Type and it will auto-recommend"
+                )       
         chart_type = st.selectbox("Select Chart Type", options=["Radar", "Pizza"])
         threshold = st.slider("Number of Similar/Best Players", 1, 25, 1) 
     with st.sidebar.expander("Optional Filters", expanded=False):
@@ -332,15 +324,11 @@ def main():
         stats = df.columns.tolist()
         excluded_cols = ["Player", "Team", "Position", "Age", "Similarity", "Secondary Position", "Nation", "Conference"]
         stats = [col for col in stats if col not in excluded_cols]
-        compare = st.text_input("Enter a Player to Compare To (Optional)")
-        suggest = [player for player in all_player_names if compare in player]
-        if len(suggest) > 0:
-                    selected_comp = st.selectbox(
-                        "Compare Suggestions",
-                        suggest,
-                        index=0, 
-                        help="Select a player from the suggestions below to compare with."
-                    )        
+        compare = st.selectbox(
+                    "Select a Player to Compare with",
+                    options=[""]+all_player_names,
+                    help="Select a player from the suggestions."
+                )
         stats = st.multiselect(
             "Select Stats for Chart & Table:",
             options=stats,
@@ -386,15 +374,8 @@ def main():
     #choose df from position, then provide available stats for selection
     df["Player"] = df["Player"].apply(lambda x: unidecode(x) if isinstance(x, str) else x)
     if name:
-        name = name.title()
-        #implement suggest name feature
-        suggestions = [player for player in all_player_names if name in player]
-        if len(suggestions) > 0:
-            name = selected_name
-        else:
-            st.warning("No suggestions available.")
+        #name = name.title()
         player = df[df["Player"]==name]
-        #name = 
         if not player.empty:
             if len(stats)<3:
                 st.warning("Select 3 or more stats for visualization")
@@ -410,12 +391,8 @@ def main():
             #check if comparison player exists
             if compare:
                 #st.header(f"{name.title()} vs. {compare.title()}")
-                compare = compare.title()
-                suggest = [player for player in all_player_names if compare in player]
-                if len(suggestions) > 0:
-                    
-                    compare = selected_comp
-                #player_2 = df[df["Player"].lower()==compare]
+                #compare = compare.title()
+                
                 player_2 = df[df["Player"]==compare]
                 if player_2.empty:
                     st.warning(f"{compare} not found")
