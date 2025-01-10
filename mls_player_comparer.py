@@ -15,7 +15,7 @@ from unidecode import unidecode
 if 'warnings' not in sys.modules:
     import warnings
 
-
+#Code written by Adith George, dataset built using data from FBRef, inspired by work by Naveen Elliott, Liam Henshaw, and other football data analysts on LinkedIn
     
 #radar chart creation
 def radar(player, position, stats, title):
@@ -309,24 +309,45 @@ def main():
     st.sidebar.header("Player Search and Filters")
     tab1, tab2,tab3 = st.tabs(["Chart", "Similar Players", "Best Players"])
     with st.sidebar.expander("Required", expanded=True):
-        name = st.text_input("Enter a Player's Name", help="Suggestions will appear once you type.")        
         position = st.selectbox("Select Position", options=["FW", "MF", "DF", "GK"])
+        df = gk if position=="GK" else pl
+        all_player_names = df["Player"].apply(lambda x: unidecode(x)).tolist()
+        name = st.text_input("Enter a Player's Name", help="Suggestions will appear once you type.")
+        if name:
+            name = name.title()
+            #implement suggest name feature
+            suggestions = [player for player in all_player_names if name in player]
+            if len(suggestions) > 0:
+                selected_name = st.selectbox(
+                    "Suggestions",
+                    suggestions,
+                    index=0, 
+                    help="Select a player from the suggestions below."
+                )
+                name = selected_name        
         chart_type = st.selectbox("Select Chart Type", options=["Radar", "Pizza"])
         threshold = st.slider("Number of Similar/Best Players", 1, 25, 1) 
     with st.sidebar.expander("Optional Filters", expanded=False):
-        df = gk if position=="GK" else pl
-        all_player_names = df["Player"].apply(lambda x: unidecode(x)).tolist()
+        
         stats = df.columns.tolist()
         excluded_cols = ["Player", "Team", "Position", "Age", "Similarity", "Secondary Position", "Nation", "Conference"]
         stats = [col for col in stats if col not in excluded_cols]
         compare = st.text_input("Enter a Player to Compare To (Optional)")
+        suggest = [player for player in all_player_names if compare in player]
+        if len(suggest) > 0:
+                    selected_comp = st.selectbox(
+                        "Compare Suggestions",
+                        suggest,
+                        index=0, 
+                        help="Select a player from the suggestions below to compare with."
+                    )        
         stats = st.multiselect(
             "Select Stats for Chart & Table:",
             options=stats,
             default=default_stats.get(position)
         )
         nation_filter = st.selectbox("Filter by Nation", options=["All"] + sorted(df["Nation"].dropna().unique().tolist()))
-        team_filter = st.selectbox("Filter by Team", options=["All"] + list(teams.values()))
+        team_filter = st.selectbox("Filter by Team", options=["All"] + sorted(list(teams.values())))
         
     with tab3:
         #st.subheader("Top Players Across Selected Stats")
@@ -369,12 +390,6 @@ def main():
         #implement suggest name feature
         suggestions = [player for player in all_player_names if name in player]
         if len(suggestions) > 0:
-            selected_name = st.selectbox(
-                "Suggestions",
-                suggestions,
-                index=0, 
-                help="Select a player from the suggestions below."
-            )
             name = selected_name
         else:
             st.warning("No suggestions available.")
@@ -398,12 +413,7 @@ def main():
                 compare = compare.title()
                 suggest = [player for player in all_player_names if compare in player]
                 if len(suggestions) > 0:
-                    selected_comp = st.selectbox(
-                        "Compare Suggestions",
-                        suggest,
-                        index=0, 
-                        help="Select a player from the suggestions below to compare with."
-                    )
+                    
                     compare = selected_comp
                 #player_2 = df[df["Player"].lower()==compare]
                 player_2 = df[df["Player"]==compare]
